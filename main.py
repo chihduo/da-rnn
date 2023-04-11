@@ -7,8 +7,8 @@ import torch
 from torch import nn
 from torch import optim
 from sklearn.preprocessing import StandardScaler
-from sklearn.externals import joblib
-
+# from sklearn.externals import joblib
+import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -42,6 +42,7 @@ def da_rnn(train_data: TrainData, n_targs: int, encoder_hidden_size=64, decoder_
            T=10, learning_rate=0.01, batch_size=128):
 
     train_cfg = TrainConfig(T, int(train_data.feats.shape[0] * 0.7), batch_size, nn.MSELoss())
+
     logger.info(f"Training size: {train_cfg.train_size:d}.")
 
     enc_kwargs = {"input_size": train_data.feats.shape[1], "hidden_size": encoder_hidden_size, "T": T}
@@ -186,14 +187,48 @@ def predict(t_net: DaRnnNet, t_dat: TrainData, train_size: int, batch_size: int,
 save_plots = True
 debug = False
 
-raw_data = pd.read_csv(os.path.join("data", "nasdaq100_padding.csv"), nrows=100 if debug else None)
+# raw_data = pd.read_csv(os.path.join("data", "nasdaq100_padding.csv"), nrows=100 if debug else None)
+# logger.info(f"Shape of data: {raw_data.shape}.\nMissing in data: {raw_data.isnull().sum().sum()}.")
+# targ_cols = ("NDX",)
+# data, scaler = preprocess_data(raw_data, targ_cols)
+#
+# da_rnn_kwargs = {"batch_size": 128, "T": 10}
+# config, model = da_rnn(data, n_targs=len(targ_cols), learning_rate=.001, **da_rnn_kwargs)
+# iter_loss, epoch_loss = train(model, data, config, n_epochs=10, save_plots=save_plots)
+# final_y_pred = predict(model, data, config.train_size, config.batch_size, config.T)
+#
+# plt.figure()
+# plt.semilogy(range(len(iter_loss)), iter_loss)
+# utils.save_or_show_plot("iter_loss.png", save_plots)
+#
+# plt.figure()
+# plt.semilogy(range(len(epoch_loss)), epoch_loss)
+# utils.save_or_show_plot("epoch_loss.png", save_plots)
+#
+# plt.figure()
+# plt.plot(final_y_pred, label='Predicted')
+# plt.plot(data.targs[config.train_size:], label="True")
+# plt.legend(loc='upper left')
+# utils.save_or_show_plot("final_predicted.png", save_plots)
+#
+# with open(os.path.join("data", "da_rnn_kwargs.json"), "w") as fi:
+#     json.dump(da_rnn_kwargs, fi, indent=4)
+#
+# joblib.dump(scaler, os.path.join("data", "scaler.pkl"))
+# torch.save(model.encoder.state_dict(), os.path.join("data", "encoder.torch"))
+# torch.save(model.decoder.state_dict(), os.path.join("data", "decoder.torch"))
+
+
+##read other datas
+#n_epochs is increased here:
+raw_data = pd.read_csv(os.path.join("data", "A1_bin.csv"), nrows=1 if debug else None)
 logger.info(f"Shape of data: {raw_data.shape}.\nMissing in data: {raw_data.isnull().sum().sum()}.")
-targ_cols = ("NDX",)
+targ_cols = ("ClassificationValue",)
 data, scaler = preprocess_data(raw_data, targ_cols)
 
 da_rnn_kwargs = {"batch_size": 128, "T": 10}
 config, model = da_rnn(data, n_targs=len(targ_cols), learning_rate=.001, **da_rnn_kwargs)
-iter_loss, epoch_loss = train(model, data, config, n_epochs=10, save_plots=save_plots)
+iter_loss, epoch_loss = train(model, data, config, n_epochs=20, save_plots=save_plots)
 final_y_pred = predict(model, data, config.train_size, config.batch_size, config.T)
 
 plt.figure()

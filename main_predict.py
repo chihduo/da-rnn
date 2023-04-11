@@ -5,8 +5,8 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.externals import joblib
-
+# from sklearn.externals import joblib
+import joblib
 from modules import Encoder, Decoder
 from utils import numpy_to_tvar
 import utils
