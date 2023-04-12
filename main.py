@@ -22,6 +22,38 @@ from constants import device
 logger = utils.setup_log()
 logger.info(f"Using computation device: {device}")
 
+N = 1000
+def preprocess_data1(dat, col_names) -> Tuple[TrainData, StandardScaler]:
+
+
+    mask = np.zeros(dat.shape[0], dtype=int)
+
+    # targs = dat.loc[:,dat.columns == (col_names)]
+    targs = pd.DataFrame()
+    for col_name in col_names:
+        targs[col_name] = dat[col_name]
+    targs = pd.DataFrame(targs).to_numpy()
+
+    for col_name in col_names:
+        dat[col_name] = mask
+
+    scale = StandardScaler().fit(dat)
+    proc_dat = scale.transform(dat)
+
+    mask = np.ones(proc_dat.shape[1], dtype=bool)
+    dat_cols = list(dat.columns)
+    for col_name in col_names:
+        mask[dat_cols.index(col_name)] = False
+
+    feats = proc_dat[:, mask]
+
+    # print(type(feats))
+    # print(type(targs))
+    #
+    # print("feats:", feats)
+    # print("targs:", targs)
+
+    return TrainData(feats, targs), scale
 
 def preprocess_data(dat, col_names) -> Tuple[TrainData, StandardScaler]:
     scale = StandardScaler().fit(dat)
@@ -36,7 +68,6 @@ def preprocess_data(dat, col_names) -> Tuple[TrainData, StandardScaler]:
     targs = proc_dat[:, ~mask]
 
     return TrainData(feats, targs), scale
-
 
 def da_rnn(train_data: TrainData, n_targs: int, encoder_hidden_size=64, decoder_hidden_size=64,
            T=10, learning_rate=0.01, batch_size=128):
@@ -92,7 +123,7 @@ def train(net: DaRnnNet, train_data: TrainData, t_cfg: TrainConfig, n_epochs=10,
 
         epoch_losses[e_i] = np.mean(iter_losses[range(e_i * iter_per_epoch, (e_i + 1) * iter_per_epoch)])
 
-        if e_i % 10 == 0:
+        if e_i % 50 == 0:
             y_test_pred = predict(net, train_data,
                                   t_cfg.train_size, t_cfg.batch_size, t_cfg.T,
                                   on_train=False)
@@ -110,6 +141,20 @@ def train(net: DaRnnNet, train_data: TrainData, t_cfg: TrainConfig, n_epochs=10,
             plt.plot(range(t_cfg.T + len(y_train_pred), len(train_data.targs) + 1), y_test_pred,
                      label='Predicted - Test')
             plt.legend(loc='upper left')
+
+            plt.xticks(range(N))  # add loads of ticks
+            plt.grid()
+
+            plt.gca().margins(x=0)
+            plt.gcf().canvas.draw()
+            tl = plt.gca().get_xticklabels()
+            maxsize = max([t.get_window_extent().width for t in tl])
+            m = 0.2  # inch margin
+            s = maxsize / plt.gcf().dpi * N + 2 * m
+            margin = m / plt.gcf().get_size_inches()[0]
+
+            plt.gcf().subplots_adjust(left=margin, right=1. - margin)
+            plt.gcf().set_size_inches(s, plt.gcf().get_size_inches()[1])
             utils.save_or_show_plot(f"pred_{e_i}.png", save_plots)
 
     return iter_losses, epoch_losses
@@ -181,6 +226,13 @@ def predict(t_net: DaRnnNet, t_dat: TrainData, train_size: int, batch_size: int,
         _, input_encoded = t_net.encoder(numpy_to_tvar(X))
         y_pred[y_slc] = t_net.decoder(input_encoded, y_history).cpu().data.numpy()
 
+    # print(y_pred.shape)
+    # for i in range(0,len(y_pred[:,0])):
+    #     if y_pred[:,0][i] > 0:
+    #         y_pred[:,0][i] = 1
+    #     else:
+    #         y_pred[:,0][i] = -1
+    # # print(y_pred)
     return y_pred
 
 
@@ -221,14 +273,31 @@ debug = False
 
 ##read other datas
 #n_epochs is increased here:
-raw_data = pd.read_csv(os.path.join("data", "A1_bin.csv"), nrows=1 if debug else None)
+raw_data = pd.read_csv(os.path.join("data", "_SP500_bin.csv"), nrows=1 if debug else None)
 logger.info(f"Shape of data: {raw_data.shape}.\nMissing in data: {raw_data.isnull().sum().sum()}.")
 targ_cols = ("ClassificationValue",)
-data, scaler = preprocess_data(raw_data, targ_cols)
+data, scaler = preprocess_data1(raw_data, targ_cols)
+
+plt.plot(data.feats, data.targs)
+plt.xticks(range(N)) # add loads of ticks
+plt.grid()
+
+plt.gca().margins(x=0)
+plt.gcf().canvas.draw()
+tl = plt.gca().get_xticklabels()
+maxsize = max([t.get_window_extent().width for t in tl])
+m = 0.2 # inch margin
+s = maxsize/plt.gcf().dpi*N+2*m
+margin = m/plt.gcf().get_size_inches()[0]
+
+plt.gcf().subplots_adjust(left=margin, right=1.-margin)
+plt.gcf().set_size_inches(s, plt.gcf().get_size_inches()[1])
+utils.save_or_show_plot("data_after_preprocess_data", save_plots)
+# exit()
 
 da_rnn_kwargs = {"batch_size": 128, "T": 10}
 config, model = da_rnn(data, n_targs=len(targ_cols), learning_rate=.001, **da_rnn_kwargs)
-iter_loss, epoch_loss = train(model, data, config, n_epochs=20, save_plots=save_plots)
+iter_loss, epoch_loss = train(model, data, config, n_epochs=250, save_plots=save_plots)
 final_y_pred = predict(model, data, config.train_size, config.batch_size, config.T)
 
 plt.figure()
@@ -243,6 +312,19 @@ plt.figure()
 plt.plot(final_y_pred, label='Predicted')
 plt.plot(data.targs[config.train_size:], label="True")
 plt.legend(loc='upper left')
+plt.xticks(range(N)) # add loads of ticks
+plt.grid()
+
+plt.gca().margins(x=0)
+plt.gcf().canvas.draw()
+tl = plt.gca().get_xticklabels()
+maxsize = max([t.get_window_extent().width for t in tl])
+m = 0.2 # inch margin
+s = maxsize/plt.gcf().dpi*N+2*m
+margin = m/plt.gcf().get_size_inches()[0]
+
+plt.gcf().subplots_adjust(left=margin, right=1.-margin)
+plt.gcf().set_size_inches(s, plt.gcf().get_size_inches()[1])
 utils.save_or_show_plot("final_predicted.png", save_plots)
 
 with open(os.path.join("data", "da_rnn_kwargs.json"), "w") as fi:
